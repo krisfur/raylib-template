@@ -32,3 +32,5 @@ Thumbs.db
 # Debug files
 *.dSYM/
 *.pdb 
+
+screencast.webm

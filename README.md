@@ -4,6 +4,8 @@
 
 A basic 2D game template built with raylib and SDL2 for reliable controller support. Features fullscreen scaling, a main menu, game states, and automatic save/load functionality.
 
+![screencast](screencast.gif)
+
 ## Features
 
 - **Fullscreen Scaling**: Automatically scales UI and player movement to any resolution
