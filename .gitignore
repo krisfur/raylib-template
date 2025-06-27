@@ -1,0 +1,34 @@
+# Build directories
+build/
+build_sdl2/
+sdl2_build/
+
+# CMake files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Executables
+*.exe
+*.out
+my_raylib_game
+my_raylib_game_sdl2
+
+# Save files
+game_save.dat
+*.dat
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Debug files
+*.dSYM/
+*.pdb 
