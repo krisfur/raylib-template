@@ -93,4 +93,11 @@ if(WAYLAND_FOUND)
     message(STATUS "Wayland support: Enabled")
 else()
     message(STATUS "Wayland support: Not detected (will use X11)")
-endif() 
+endif()
+
+# Copy resources folder to build directory after build
+add_custom_command(
+    TARGET game POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_SOURCE_DIR}/resources $<TARGET_FILE_DIR:game>/resources
+) 

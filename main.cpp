@@ -30,8 +30,9 @@ struct SaveData {
     bool isFullscreen;
     int targetFPS;
     InputMode inputMode;
+    float volume; // 0.0 to 1.0
     
-    SaveData() : playerPos{0.1f, 0.1f}, isFullscreen(true), targetFPS(120), inputMode(InputMode::KEYBOARD_MOUSE) {}
+    SaveData() : playerPos{0.1f, 0.1f}, isFullscreen(true), targetFPS(120), inputMode(InputMode::KEYBOARD_MOUSE), volume(0.5f) {}
 };
 
 // Menu Item structure
@@ -109,6 +110,11 @@ private:
     bool pendingFullscreenResize = false;
     int fullscreenResizeFrames = 0;
     
+    float volume = 0.5f;
+    
+    Sound volumeChangeSound;
+    bool soundLoaded = false;
+    
     void DetectDisplayServer() {
         const char* waylandDisplay = getenv("WAYLAND_DISPLAY");
         const char* x11Display = getenv("DISPLAY");
@@ -185,10 +191,19 @@ private:
 public:
     Game() : currentState(GameState::MENU), screenWidth(1920), screenHeight(1080), 
              isFullscreen(true), targetFPS(120), playerPos{100, 100},
-             currentInputMode(InputMode::KEYBOARD_MOUSE) {
+             currentInputMode(InputMode::KEYBOARD_MOUSE), volume(0.5f) {
+        InitAudioDevice();
         DetectDisplayServer();
         InitSaveFilePath();
         LoadGame();
+        SetMasterVolume(volume);
+        // Try to load a default sound effect
+        if (FileExists("resources/click.wav")) {
+            volumeChangeSound = LoadSound("resources/click.wav");
+            soundLoaded = true;
+        } else {
+            soundLoaded = false;
+        }
         InitializeWindow();
         SetPlayerPositionFromSave();
         InitializeMenus();
@@ -197,9 +212,11 @@ public:
     
     ~Game() {
         SaveGame();
+        if (soundLoaded) UnloadSound(volumeChangeSound);
         if (controller) {
             SDL_GameControllerClose(controller);
         }
+        CloseAudioDevice();
         SDL_Quit();
     }
     
@@ -249,6 +266,7 @@ private:
         saveData.isFullscreen = isFullscreen;
         saveData.targetFPS = targetFPS;
         saveData.inputMode = currentInputMode;
+        saveData.volume = volume;
         
         std::ofstream file(saveFilePath, std::ios::binary);
         if (file.is_open()) {
@@ -261,6 +279,8 @@ private:
         } else {
             printf("[ERROR] Failed to save game\n");
         }
+        
+        if (soundLoaded) PlaySound(volumeChangeSound);
     }
     
     void LoadGame() {
@@ -273,8 +293,10 @@ private:
             isFullscreen = saveData.isFullscreen;
             targetFPS = saveData.targetFPS;
             currentInputMode = saveData.inputMode;
+            volume = saveData.volume;
         } else {
             printf("No save file found, using defaults\n");
+            volume = 0.5f;
         }
     }
     
@@ -356,7 +378,7 @@ private:
         float buttonSpacing = winH * 0.02f; // 2% of window height
         
         int numMainButtons = 4; // Added Save Game
-        int numSettingsButtons = 2;
+        int numSettingsButtons = 3; // Volume, Toggle Fullscreen, Back to Menu
         int numPauseButtons = 3; // Added Save Game
         
         float totalMainHeight = numMainButtons * buttonHeight + (numMainButtons - 1) * buttonSpacing;
@@ -373,8 +395,9 @@ private:
         float settingsStartY = winH / 2.0f - totalSettingsHeight / 2.0f;
         
         settingsMenuItems.clear();
-        settingsMenuItems.emplace_back("Toggle Fullscreen", centerX, settingsStartY + 0 * (buttonHeight + buttonSpacing), buttonWidth, buttonHeight);
-        settingsMenuItems.emplace_back("Back to Menu", centerX, settingsStartY + 1 * (buttonHeight + buttonSpacing), buttonWidth, buttonHeight);
+        settingsMenuItems.emplace_back("Volume", centerX, settingsStartY + 0 * (buttonHeight + buttonSpacing), buttonWidth, buttonHeight);
+        settingsMenuItems.emplace_back("Toggle Fullscreen", centerX, settingsStartY + 1 * (buttonHeight + buttonSpacing), buttonWidth, buttonHeight);
+        settingsMenuItems.emplace_back("Back to Menu", centerX, settingsStartY + 2 * (buttonHeight + buttonSpacing), buttonWidth, buttonHeight);
         
         // Initialize pause menu items
         float totalPauseHeight = numPauseButtons * buttonHeight + (numPauseButtons - 1) * buttonSpacing;
@@ -477,10 +500,50 @@ private:
                     if (item.isHovered) {
                         mouseHovering = true;
                     }
+                    // Volume menu item mouse +/-
+                    if (currentState == GameState::SETTINGS && item.text == "Volume") {
+                        float btnSize = item.bounds.height * 0.7f;
+                        Rectangle minusBtn = {item.bounds.x + 8, item.bounds.y + item.bounds.height/2 - btnSize/2, btnSize, btnSize};
+                        Rectangle plusBtn = {item.bounds.x + item.bounds.width - btnSize - 8, item.bounds.y + item.bounds.height/2 - btnSize/2, btnSize, btnSize};
+                        if (CheckCollisionPointRec(mousePos, minusBtn) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                            volume = std::clamp(volume - 0.05f, 0.0f, 1.0f);
+                            volume = roundf(volume * 20.0f) / 20.0f;
+                            SetMasterVolume(volume);
+                            if (soundLoaded) PlaySound(volumeChangeSound);
+                            SaveGame();
+                        }
+                        if (CheckCollisionPointRec(mousePos, plusBtn) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                            volume = std::clamp(volume + 0.05f, 0.0f, 1.0f);
+                            volume = roundf(volume * 20.0f) / 20.0f;
+                            SetMasterVolume(volume);
+                            if (soundLoaded) PlaySound(volumeChangeSound);
+                            SaveGame();
+                        }
+                    }
                     if (item.isHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                         HandleMenuClick(item.text);
                         mouseUsed = true;
                     }
+                }
+            }
+            
+            // Volume adjustment with keyboard (A/D/Left/Right) when selected
+            if (currentState == GameState::SETTINGS && menuItems[selectedMenuItem].text == "Volume") {
+                bool left = IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A);
+                bool right = IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D);
+                if (left) {
+                    volume = std::clamp(volume - 0.05f, 0.0f, 1.0f);
+                    volume = roundf(volume * 20.0f) / 20.0f;
+                    SetMasterVolume(volume);
+                    if (soundLoaded) PlaySound(volumeChangeSound);
+                    SaveGame();
+                }
+                if (right) {
+                    volume = std::clamp(volume + 0.05f, 0.0f, 1.0f);
+                    volume = roundf(volume * 20.0f) / 20.0f;
+                    SetMasterVolume(volume);
+                    if (soundLoaded) PlaySound(volumeChangeSound);
+                    SaveGame();
                 }
             }
             
@@ -559,6 +622,28 @@ private:
                         HandleMenuClick(menuItems[selectedMenuItem].text);
                     }
                 }
+                
+                // Volume adjustment with controller (one jump per press)
+                static bool dPadLeftPressedVol = false;
+                static bool dPadRightPressedVol = false;
+                if (currentState == GameState::SETTINGS && menuItems[selectedMenuItem].text == "Volume") {
+                    bool dpadLeft = SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT);
+                    bool dpadRight = SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
+                    if (IsButtonJustPressed(dPadLeftPressedVol, dpadLeft)) {
+                        volume = std::clamp(volume - 0.05f, 0.0f, 1.0f);
+                        volume = roundf(volume * 20.0f) / 20.0f;
+                        SetMasterVolume(volume);
+                        if (soundLoaded) PlaySound(volumeChangeSound);
+                        SaveGame();
+                    }
+                    if (IsButtonJustPressed(dPadRightPressedVol, dpadRight)) {
+                        volume = std::clamp(volume + 0.05f, 0.0f, 1.0f);
+                        volume = roundf(volume * 20.0f) / 20.0f;
+                        SetMasterVolume(volume);
+                        if (soundLoaded) PlaySound(volumeChangeSound);
+                        SaveGame();
+                    }
+                }
             }
         }
     }
@@ -577,7 +662,9 @@ private:
                 shouldExit = true;
             }
         } else if (currentState == GameState::SETTINGS) {
-            if (itemText == "Toggle Fullscreen") {
+            if (itemText == "Volume") {
+                // Implement volume change logic
+            } else if (itemText == "Toggle Fullscreen") {
                 if (isFullscreen) {
                     // Switch to windowed mode with title bar
                     SetWindowState(FLAG_WINDOW_RESIZABLE);
@@ -845,22 +932,51 @@ private:
         int titleWidth = MeasureText(title.c_str(), titleSize);
         DrawText(title.c_str(), winW / 2 - titleWidth / 2, winH * 0.1f, titleSize, DARKGRAY);
         
-        for (const auto& item : menuItems) {
+        for (size_t i = 0; i < menuItems.size(); ++i) {
+            const auto& item = menuItems[i];
             Color drawColor = item.color;
             if (item.isHovered || item.isSelected) {
                 drawColor = item.hoverColor;
             }
-            
             DrawRectangleRec(item.bounds, drawColor);
             DrawRectangleLinesEx(item.bounds, 2, BLACK);
             
-            // Scale text size relative to button size
-            int textSize = item.bounds.height * 0.5f;
-            int textWidth = MeasureText(item.text.c_str(), textSize);
-            DrawText(item.text.c_str(), 
+            // Volume menu item special rendering
+            if (currentState == GameState::SETTINGS && item.text == "Volume") {
+                // Draw volume percentage
+                int textSize = item.bounds.height * 0.5f;
+                std::string volText = "Volume: " + std::to_string((int)(volume * 100)) + "%";
+                int textWidth = MeasureText(volText.c_str(), textSize);
+                DrawText(volText.c_str(), 
                     item.bounds.x + item.bounds.width / 2 - textWidth / 2,
                     item.bounds.y + item.bounds.height / 2 - textSize / 2,
                     textSize, WHITE);
+                // Draw - and + buttons
+                float btnSize = item.bounds.height * 0.7f;
+                Rectangle minusBtn = {item.bounds.x + 8, item.bounds.y + item.bounds.height/2 - btnSize/2, btnSize, btnSize};
+                Rectangle plusBtn = {item.bounds.x + item.bounds.width - btnSize - 8, item.bounds.y + item.bounds.height/2 - btnSize/2, btnSize, btnSize};
+                DrawRectangleRec(minusBtn, GRAY);
+                DrawRectangleRec(plusBtn, GRAY);
+                DrawRectangleLinesEx(minusBtn, 2, BLACK);
+                DrawRectangleLinesEx(plusBtn, 2, BLACK);
+                // Draw - and + symbols
+                int symbolSize = btnSize * 0.6f;
+                int minusX = minusBtn.x + btnSize/2 - symbolSize/2;
+                int minusY = minusBtn.y + btnSize/2 - symbolSize/8;
+                DrawRectangle(minusX, minusY, symbolSize, symbolSize/4, BLACK);
+                int plusX = plusBtn.x + btnSize/2 - symbolSize/2;
+                int plusY = plusBtn.y + btnSize/2 - symbolSize/8;
+                DrawRectangle(plusX, plusY, symbolSize, symbolSize/4, BLACK);
+                DrawRectangle(plusX + symbolSize/2 - symbolSize/8, plusY - symbolSize/2 + symbolSize/8, symbolSize/4, symbolSize, BLACK);
+            } else {
+                // Scale text size relative to button size
+                int textSize = item.bounds.height * 0.5f;
+                int textWidth = MeasureText(item.text.c_str(), textSize);
+                DrawText(item.text.c_str(), 
+                        item.bounds.x + item.bounds.width / 2 - textWidth / 2,
+                        item.bounds.y + item.bounds.height / 2 - textSize / 2,
+                        textSize, WHITE);
+            }
         }
         
         // Scale instruction text
