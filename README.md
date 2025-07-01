@@ -123,6 +123,13 @@ g++ -o game main.cpp -lraylib -lSDL2 -framework OpenGL -framework Cocoa -framewo
 - `run.sh` - Build and run script (Linux/macOS)
 - `CMakeLists.txt` - Cross-platform CMake configuration
 - `game_save.dat` - Save file (created automatically)
+- `resources/` - Folder for all game assets (sounds, images, etc.)
+
+## Assets/Resources
+
+- All game assets (sounds, images, etc.) should be placed in the `resources` folder in the project root.
+- The build system (CMake) automatically copies the `resources` folder next to the game executable after each build.
+- When distributing or packaging your game, make sure to include the `resources` folder alongside your executable.
 
 ## Technical Details
 
@@ -215,4 +222,9 @@ The CMake configuration automatically detects the platform and links the appropr
 
 ## License
 
-This template is provided as-is for educational and development purposes. 
+This template is provided as-is for educational and development purposes.
+
+### Missing Assets?
+
+If you see errors about missing files (e.g., `resources/click.wav`), make sure the `resources` folder exists next to your executable.  
+CMake will copy it automatically when you build, but if you move the executable, copy the `resources` folder as well. 
