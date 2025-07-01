@@ -49,8 +49,17 @@ sudo apt install libraylib-dev libsdl2-dev g++ cmake
 
 #### macOS
 ```bash
-brew install raylib sdl2 gcc cmake
+brew install raylib sdl2 gcc cmake pkg-config
 ```
+
+If you encounter errors about missing libraries when running the game, try:
+
+```bash
+export DYLD_LIBRARY_PATH=/opt/homebrew/lib:$DYLD_LIBRARY_PATH
+./game
+```
+
+All dependencies are installed via Homebrew. If you have issues with CMake not finding raylib or SDL2, ensure that pkg-config is installed and up to date.
 
 #### Windows
 1. Install [Visual Studio](https://visualstudio.microsoft.com/) or [MinGW](https://www.mingw-w64.org/)

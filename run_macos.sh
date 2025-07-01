@@ -30,6 +30,11 @@ if ! command -v g++ &> /dev/null; then
     brew install gcc
 fi
 
+if ! command -v pkg-config &> /dev/null; then
+    echo "Installing pkg-config..."
+    brew install pkg-config
+fi
+
 echo "Using CMake build system (recommended)..."
 
 # Create build directory
@@ -39,8 +44,8 @@ cd build
 # Configure with CMake
 cmake .. -G "Unix Makefiles"
 if [ $? -ne 0 ]; then
-    echo "CMake configuration failed. Please ensure raylib and SDL2 are installed:"
-    echo "  brew install raylib sdl2 cmake gcc"
+    echo "CMake configuration failed. Please ensure raylib, SDL2, cmake, gcc, and pkg-config are installed:"
+    echo "  brew install raylib sdl2 cmake gcc pkg-config"
     exit 1
 fi
 
@@ -53,5 +58,11 @@ fi
 
 echo "CMake build successful! Running game..."
 ./game
+
+if [ $? -ne 0 ]; then
+    echo "If the game fails to launch due to missing libraries, try setting:"
+    echo "  export DYLD_LIBRARY_PATH=/opt/homebrew/lib:$DYLD_LIBRARY_PATH"
+    echo "and run ./game again."
+fi
 
 cd .. 

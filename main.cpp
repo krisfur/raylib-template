@@ -106,6 +106,9 @@ private:
     // Wayland detection
     bool isWayland = false;
     
+    bool pendingFullscreenResize = false;
+    int fullscreenResizeFrames = 0;
+    
     void DetectDisplayServer() {
         const char* waylandDisplay = getenv("WAYLAND_DISPLAY");
         const char* x11Display = getenv("DISPLAY");
@@ -210,24 +213,21 @@ public:
 private:
     void InitializeWindow() {
         int monitor = GetCurrentMonitor();
-        
         if (isFullscreen) {
             screenWidth = GetMonitorWidth(monitor);
             screenHeight = GetMonitorHeight(monitor);
         } else {
-            // Use saved window size or default to 1280x720
             screenWidth = 1280;
             screenHeight = 720;
         }
-        
         InitWindow(screenWidth, screenHeight, "2D Game Template");
         SetTargetFPS(targetFPS);
-        
-        // Disable default ESC key behavior that closes the window
         SetExitKey(KEY_NULL);
-        
         if (isFullscreen) {
             SetWindowState(FLAG_FULLSCREEN_MODE);
+            // Force resize to monitor resolution after entering fullscreen
+            int monitor = GetCurrentMonitor();
+            SetWindowSize(GetMonitorWidth(monitor), GetMonitorHeight(monitor));
         }
     }
     
@@ -387,6 +387,15 @@ private:
     }
     
     void Update() {
+        // Workaround: force fullscreen resize for a few frames after toggling
+        if (pendingFullscreenResize && fullscreenResizeFrames > 0) {
+            int monitor = GetCurrentMonitor();
+            SetWindowSize(GetMonitorWidth(monitor), GetMonitorHeight(monitor));
+            fullscreenResizeFrames--;
+            if (fullscreenResizeFrames == 0) {
+                pendingFullscreenResize = false;
+            }
+        }
         CheckInputMode();
         
         // Toggle controller debug overlay
@@ -578,12 +587,12 @@ private:
                     int monitor = GetCurrentMonitor();
                     int monitorWidth = GetMonitorWidth(monitor);
                     int monitorHeight = GetMonitorHeight(monitor);
-                    
-                    SetWindowSize(monitorWidth, monitorHeight);
                     SetWindowState(FLAG_FULLSCREEN_MODE);
+                    // Workaround: force resize for a few frames
+                    pendingFullscreenResize = true;
+                    fullscreenResizeFrames = 10;
                 }
                 isFullscreen = !isFullscreen;
-                
                 // Add a longer delay for fullscreen toggle
                 for (int i = 0; i < 3; i++) {
                     EndDrawing();
@@ -591,10 +600,8 @@ private:
                     ClearBackground({30, 30, 46, 255});
                     EndDrawing();
                 }
-                
                 // Recalculate player position for new window size
                 SetPlayerPositionFromSave();
-                
                 forceMenuRecalc = true; // Force recalculation after delay
             } else if (itemText == "Back to Menu") {
                 SaveGame(); // Auto-save when going back to menu

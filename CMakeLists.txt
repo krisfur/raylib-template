@@ -9,6 +9,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(RAYLIB REQUIRED raylib)
 
+# Add raylib library directory to linker search path on macOS
+if(APPLE)
+    link_directories(${RAYLIB_LIBRARY_DIRS})
+endif()
+
 # Find SDL2 - try find_package first, then pkg-config
 find_package(SDL2 QUIET)
 if(NOT SDL2_FOUND)
@@ -37,7 +42,7 @@ if(UNIX AND NOT APPLE)
     endif()
 elseif(APPLE)
     # macOS
-    set(PLATFORM_LIBS GL m pthread dl)
+    set(PLATFORM_LIBS "-framework OpenGL" m pthread dl)
 elseif(WIN32)
     # Windows
     set(PLATFORM_LIBS opengl32 m)
