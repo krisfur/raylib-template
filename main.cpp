@@ -112,7 +112,7 @@ private:
     
     float volume = 0.5f;
     
-    Sound volumeChangeSound;
+    Sound clickSound;
     bool soundLoaded = false;
     
     void DetectDisplayServer() {
@@ -188,6 +188,12 @@ private:
         return false;
     }
     
+    void PlayClickSound() {
+        if (soundLoaded) {
+            PlaySound(clickSound);
+        }
+    }
+    
 public:
     Game() : currentState(GameState::MENU), screenWidth(1920), screenHeight(1080), 
              isFullscreen(true), targetFPS(120), playerPos{100, 100},
@@ -199,7 +205,7 @@ public:
         SetMasterVolume(volume);
         // Try to load a default sound effect
         if (FileExists("resources/click.wav")) {
-            volumeChangeSound = LoadSound("resources/click.wav");
+            clickSound = LoadSound("resources/click.wav");
             soundLoaded = true;
         } else {
             soundLoaded = false;
@@ -212,7 +218,7 @@ public:
     
     ~Game() {
         SaveGame();
-        if (soundLoaded) UnloadSound(volumeChangeSound);
+        if (soundLoaded) UnloadSound(clickSound);
         if (controller) {
             SDL_GameControllerClose(controller);
         }
@@ -280,7 +286,7 @@ private:
             printf("[ERROR] Failed to save game\n");
         }
         
-        if (soundLoaded) PlaySound(volumeChangeSound);
+        PlayClickSound();
     }
     
     void LoadGame() {
@@ -509,14 +515,14 @@ private:
                             volume = std::clamp(volume - 0.05f, 0.0f, 1.0f);
                             volume = roundf(volume * 20.0f) / 20.0f;
                             SetMasterVolume(volume);
-                            if (soundLoaded) PlaySound(volumeChangeSound);
+                            PlayClickSound();
                             SaveGame();
                         }
                         if (CheckCollisionPointRec(mousePos, plusBtn) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                             volume = std::clamp(volume + 0.05f, 0.0f, 1.0f);
                             volume = roundf(volume * 20.0f) / 20.0f;
                             SetMasterVolume(volume);
-                            if (soundLoaded) PlaySound(volumeChangeSound);
+                            PlayClickSound();
                             SaveGame();
                         }
                     }
@@ -535,14 +541,14 @@ private:
                     volume = std::clamp(volume - 0.05f, 0.0f, 1.0f);
                     volume = roundf(volume * 20.0f) / 20.0f;
                     SetMasterVolume(volume);
-                    if (soundLoaded) PlaySound(volumeChangeSound);
+                    PlayClickSound();
                     SaveGame();
                 }
                 if (right) {
                     volume = std::clamp(volume + 0.05f, 0.0f, 1.0f);
                     volume = roundf(volume * 20.0f) / 20.0f;
                     SetMasterVolume(volume);
-                    if (soundLoaded) PlaySound(volumeChangeSound);
+                    PlayClickSound();
                     SaveGame();
                 }
             }
@@ -633,14 +639,14 @@ private:
                         volume = std::clamp(volume - 0.05f, 0.0f, 1.0f);
                         volume = roundf(volume * 20.0f) / 20.0f;
                         SetMasterVolume(volume);
-                        if (soundLoaded) PlaySound(volumeChangeSound);
+                        PlayClickSound();
                         SaveGame();
                     }
                     if (IsButtonJustPressed(dPadRightPressedVol, dpadRight)) {
                         volume = std::clamp(volume + 0.05f, 0.0f, 1.0f);
                         volume = roundf(volume * 20.0f) / 20.0f;
                         SetMasterVolume(volume);
-                        if (soundLoaded) PlaySound(volumeChangeSound);
+                        PlayClickSound();
                         SaveGame();
                     }
                 }
@@ -649,6 +655,8 @@ private:
     }
     
     void HandleMenuClick(const std::string& itemText) {
+        PlayClickSound(); // Play sound for all menu interactions
+        
         if (currentState == GameState::MENU) {
             if (itemText == "Start Game") {
                 SetPlayerPositionFromSave();
